@@ -1,0 +1,51 @@
+# Name of the GitHub Actions workflow
+name: CICD
+
+# Trigger the workflow when code is pushed to the 'cicd-docker-ec2' branch
+on:
+  push:
+    branches: [cicd-docker-ec2]
+
+# Define jobs for the workflow
+jobs:
+  # Job for building the Docker image
+  build:
+    # Specify the runner environment for the job (latest version of Ubuntu)
+    runs-on: [ubuntu-latest]
+    # Steps to be executed in the 'build' job
+    steps:
+      # Checkout the source code from the repository
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      # Login to Docker Hub using the provided credentials
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build the Docker image for the Node.js application
+      - name: Build Docker image
+        run: docker build -t vipinrajr/nodejshosting .
+
+      # Publish the Docker image to Docker Hub
+      - name: Publish image to Docker Hub
+        run: docker push vipinrajr/nodejshosting:latest
+
+  # Job for deploying the Docker image to an AWS EC2 instance
+  deploy:
+    # Specify that this job depends on the successful completion of the 'build' job
+    needs: build
+    # Specify the runner environment for the job (AWS EC2)
+    runs-on: [aws-ec2]
+    # Steps to be executed in the 'deploy' job
+    steps:
+      # Pull the Docker image from Docker Hub
+      - name: Pull image from Docker Hub
+        run: docker pull vipinrajr/nodejshosting:latest
+
+      # Delete the existing Docker container running the Node.js app
+      - name: Delete old container
+        run: docker rm -f nodejs-app-container
+
+      # Run a new Docker container with the updated Node.js app
+      - name: Run Docker container
+        run: docker run -d -p 5000:5000 --name nodejs-app-container vipinrajr/nodejshosting
